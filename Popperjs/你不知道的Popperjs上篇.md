@@ -1,8 +1,3 @@
----
-theme: channing-cyan
-highlight: a11y-light
----
-
 ## 背景
 ElementUI 中`Tooltip`、`Select`、`Cascader`、`TimePicker`等组件中怎么把提示框定位到目标元素的，是用 Popperjs 来实现，本系列文章将从以下几个角度带你了解 Popperjs：
 
