@@ -1,0 +1,218 @@
+#### 背景
+懒加载经常出现在前端面试中，是前端性能优化的常用技巧。懒加载也叫延迟加载，把非关键资源先不加载，等用到了在加载，将加载非关键资源的时间推迟，而加快页面的初始加载时间。懒加载经常被用在图片、视频、音频、JavaScript文件等资源加载上，本文主要讨论图片的懒加载。通过文本你能收获：
+
+- 图片懒加载的原理
+- 实现图片懒加载的四种方案的原理以及优缺点
+- 图片懒加载插件：[lazyload](https://github.com/tuupola/lazyload)、[lazysizes](https://github.com/aFarkas/lazysizes)、[vanilla-lazyload](https://github.com/verlok/vanilla-lazyload)、[vue-lazyload](https://github.com/hilongjw/vue-lazyload)、[VueUse useIntersectionObserver](https://vueuse.org/core/useIntersectionObserver/)、[react-lazyload](https://github.com/twobin/react-lazyload)、[ReactUse  useIntersection](https://github.com/streamich/react-use/blob/master/docs/useIntersection.md) 源码如何实现的。
+- 图片懒加载的一些优化
+#### 原理
+图片懒加载的原理是没有在可视区域的图片暂时不加载图片，等进入可视区域后在加载图片，这样可以减少初始页面加载的图片数量而提升页面加载速度。
+图片懒加载在提升页面加载速度的同时也会伴随用户看其他未展示的图片时会有等待时间；图片加载显示会伴有布局抖动等问题。
+
+#### 方案
+图片懒加载的关键是：判断一个元素是否在可视区域。
+##### 方案一：img的loading属性设为“lazy”
+> HTMLImageElement 的 **loading** 属性为一个字符串，它的值会提示 用户代理 告诉浏览器不在可视视口内的图片该如何加载。这样一来，通过推迟图片加载仅让其在需要的时候加载而非页面初始载入时立刻加载，优化了页面的载入。
+> lazy告诉用户代理推迟图片加载直到浏览器认为其需要立即加载时才去加载。例如，如果用户正在往下滚动页面，值为 lazy 会导致图片仅在马上要出现在 可视视口中时开始加载。
+
+###### 使用方法
+```javascript
+<img src="xxx.jpg" loading="lazy" />  
+```
+###### 优点
+只设置一个属性不用JavaScript控制代码是最简单方便的方案，性能也是比较好的。
+###### 兼容性
+![image.png](https://cdn.nlark.com/yuque/0/2023/png/12948905/1675266495931-815e9ff8-3c58-43c2-a8e3-a06c5b87d54a.png#averageHue=%23e8d6bf&clientId=u0438692f-74c8-4&from=paste&height=459&id=u78fa9cbe&name=image.png&originHeight=574&originWidth=1706&originalType=binary&ratio=1&rotation=0&showTitle=false&size=120732&status=done&style=none&taskId=u5b65f321-7401-494a-a7b0-c4d238c9cfb&title=&width=1364.8)
+大部分主流浏览器都兼容该属性。
+###### 缺点
+虽然整个方案简单性能好，但问题也是最多的，所以很少使用这种方案。
+
+1. 前面提到图片懒加载用户看其他未展示的图片时会有等待时间，一般会设置一个默认图片，这种方案不能设置默认图片
+2. 图片的加载数量和图片的布局、可视区域尺寸有关，难以控制
+3. 图片的加载顺序也难以控制
+
+该方案能粗略的实现图片懒加载基本功能。
+##### 方案二：通过offsetTop来计算是否在可视区域内
+可视区域高度是 document.documentElement.clientHeight，而可视区域的位置是在滚动条滚动位置scrollTop到scrollTop+document.documentElement.clientHeight之间。因此通过
+```javascript
+image.offsetTop <= document.documentElement.clientHeight + document.documentElement.scrollTop
+```
+判断图片是否可以在可视区域内。
+```javascript
+  function lazyload() {
+        var lazyImages = document.querySelectorAll(".lazyload");
+        lazyImages.forEach(function (image) {
+          if ( image.offsetTop <= document.documentElement.clientHeight + document.documentElement.scrollTop) {
+            image.src = image.getAttribute("data-src");
+          }
+        });
+      }
+```
+添加滚动条监听
+```javascript
+  window.onscroll = function () {
+        lazyload();
+};
+```
+html结构
+```javascript
+ <img src="./default.gif" class="lazyload" data-src="./photo-1.jpg" />
+```
+###### 优化
+上面只是简单的实现图片懒加载，在实际开发中还要很多细节需要优化：
+首先是兼容性，这里有两个点涉及到兼容性：document.documentElement.clientHeight 和document.documentElement.scrollTop。
+获取浏览器窗口的内部高度方法有window.innerHeight、document.documentElement.clientHeight。
+window.innerHeight兼容性是ie9+和其他主流浏览器
+![image.png](https://cdn.nlark.com/yuque/0/2023/png/12948905/1675329311081-589c50b5-2aa4-41b2-9c4b-7631ea529b1b.png#averageHue=%23ceac87&clientId=ub9d8976c-3528-4&from=paste&height=899&id=ue192fb23&name=image.png&originHeight=899&originWidth=1402&originalType=binary&ratio=1&rotation=0&showTitle=false&size=117718&status=done&style=none&taskId=u921bbb34-6876-4d5c-8511-5d34f3f1422&title=&width=1402)
+document.documentElement.clientHeight浏览器都支持
+![image.png](https://cdn.nlark.com/yuque/0/2023/png/12948905/1675329730721-0b78cf3d-87e9-4e9e-848a-0ce63dcf8014.png#averageHue=%23ccaa86&clientId=ub9d8976c-3528-4&from=paste&height=781&id=ua429b8da&name=image.png&originHeight=781&originWidth=1421&originalType=binary&ratio=1&rotation=0&showTitle=false&size=84241&status=done&style=none&taskId=u79b7a310-f14c-4357-aa59-168414cdc59&title=&width=1421)
+因此获取浏览器窗口的内部高度document.documentElement.clientHeight没有兼容问题。
+获取滚动位置方法有window.pageYOffset和document.documentElement.scrollTop
+window.pageYOffset兼容性是ie9+和其他主流浏览器
+![image.png](https://cdn.nlark.com/yuque/0/2023/png/12948905/1675330062073-574b487f-6a74-44e8-82e7-31e7cee18039.png#averageHue=%23e1d1b5&clientId=ub9d8976c-3528-4&from=paste&height=581&id=u755dc9af&name=image.png&originHeight=581&originWidth=1395&originalType=binary&ratio=1&rotation=0&showTitle=false&size=68503&status=done&style=none&taskId=ue6c8d67c-dd82-4c0e-a367-0cd4185974d&title=&width=1395)
+在 IE8 其更早版本中可以使用document.documentElement.scrollTop。因此document.documentElement.scrollTop没有兼容问题。
+第二优化点是offsetTop
+> offsetParent 元素有滚动条的情况下计算会不会有问题
+
+> **HTMLElement.offsetTop** 为只读属性，它返回当前元素相对于其 offsetParent 元素的顶部内边距的距离。 ——MDN
+
+offsetTop是相对其offsetParent 元素的并不是相对浏览器窗口可视区域的。如果图片元素有offsetParent 那么offsetTop是有偏差的。
+```javascript
+      function getBoundingClientTop(el) {
+        let top = el.offsetTop;
+        let parent = el.offsetParent;
+        while (parent) {
+          top += parent.offsetTop;
+          parent = parent.offsetParent;
+        }
+        return top;
+      }
+```
+第三优化点避免赋值src
+代码是通过lazyload类获取需要懒加载的元素，这样会把之前已经加载图片的元素也获取到了，而重复设置src属性。
+```javascript
+   function lazyload() {
+        var lazyImages = document.querySelectorAll(".lazyload[data-src]");
+        lazyImages.forEach(function (image) {
+          if (
+            getBoundingClientTop(image) <=
+            document.documentElement.clientHeight +
+              document.documentElement.scrollTop
+          ) {
+            image.src = image.getAttribute("data-src");
+            image.removeAttribute("data-src")
+          }
+        });
+      }
+```
+通过lazyload类并且有data-src来获取元素，src设置完后移除data-src属性来避免重复设置src
+第四优化点onscroll是否添加防抖
+onscroll常用的优化点是加入防抖来减少事件触发的频率，但这里如果加了防抖，计算元素是否在可视区域内的精度就差很多，当滚动速度比较快的情况下加载反应不灵敏，这里就要找平衡点。
+第五优化点页面中局部的div滚动图片懒加载
+除了整个页面的滚动图片懒加载，也有页面中局部滚动图片懒加载，就需要给制定的有滚动条dom元素绑定onscroll事件。
+```javascript
+    srcollDom.onscroll = function () {
+        lazyload();
+      };
+```
+并且获取图片top是相对有滚动条dom元素
+```javascript
+getBoundingClientTop(image)-getBoundingClientTop(srcollDom) <= srcollDom.clientHeight + srcollDom.scrollTop
+```
+第六优化点加载图片的时间点提前
+代码中是图片元素进入可视区域后才加载图片，用户就需要等待一段时间才能看到图片显示出来，如果把图片加载时间提前，图片元素距离可视区域一定范围内就加载图片，那么用户等待时间就会减少一些。
+优点：兼容性好，各个环节可以控制
+缺点：性能相对不是很好，滚动事件频繁触发，并且获取元素的位置信息，可能会强行触发重排和重绘导致一定的性能消耗。
+##### 方案三：通过getBoundingClientRect来计算是否在可视区域内
+大致思路和方案二一样只是把获取图片元素offsetTop改成getBoundingClientRect方法获取离可视区顶端的距离。比方案一要简单一点，缺点也和方案一一样。
+##### 方案四：使用IntersectionObserver来判断是否在可视区域内
+该方案是通过IntersectionObserver来判断图片元素是否在可视区域内。
+> **IntersectionObserver()**构造器创建并返回一个IntersectionObserver对象。如果指定rootMargin则会检查其是否符合语法规定，检查阈值以确保全部在 0.0 到 1.0 之间，并且阈值列表会按升序排列。如果阈值列表为空，则默认为一个 [0.0] 的数组。               —— MDN
+
+完全没看懂mdn的这段解释，简单说就是
+> IntersectionObserver接口提供了一种异步观察目标元素与祖先元素或顶级文档[viewport](https://link.juejin.cn/?target=https%3A%2F%2Fdeveloper.mozilla.org%2Fen-US%2Fdocs%2FGlossary%2Fviewport)的交集中的变化的方法。祖先元素与视窗viewport被称为**根(root)。**
+
+```javascript
+      var images = document.querySelectorAll(".lazyload");
+      var io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach((item) => {
+            // isIntersecting是一个Boolean值，判断目标元素当前是否可见
+            if (item.isIntersecting) {
+              item.target.src = item.target.dataset.src;
+              // 图片加载后即停止监听该元素
+              io.unobserve(item.target);
+            }
+          });
+        }
+      );
+      images.forEach(function(image){
+        io.observe(image)
+      })
+```
+IntersectionObserver的监听对于页面局部滚动条也是有效的，不用在单独对局部滚动条进行处理。
+而提前加载图片通过配置rootMargin来扩大监听区域
+```javascript
+      var images = document.querySelectorAll(".lazyload");
+      var io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach((item) => {
+            // isIntersecting是一个Boolean值，判断目标元素当前是否可见
+            if (item.isIntersecting) {
+              item.target.src = item.target.dataset.src;
+              // 图片加载后即停止监听该元素
+              io.unobserve(item.target);
+            }
+          });
+        },
+        {
+          root: null,
+          rootMargin: "0px 0px 300px 0px",
+        }
+      );
+      images.forEach(function(image){
+        io.observe(image);
+      })
+```
+兼容性
+![image.png](https://cdn.nlark.com/yuque/0/2023/png/12948905/1675408992654-6399c023-0a5f-444b-ab69-c9c7503ad446.png#averageHue=%23d5b18d&clientId=u2c53778b-7a40-4&from=paste&height=1016&id=ue8a08f46&name=image.png&originHeight=1016&originWidth=1386&originalType=binary&ratio=1&rotation=0&showTitle=false&size=152622&status=done&style=none&taskId=ud0daa004-cf22-4fe2-8b6b-a295512f4a0&title=&width=1386)
+在一些低版本浏览器中还存在一些问题。
+优点：性能好，简单。
+缺点：低版本浏览器在IntersectionObserver存在问题，不支持IE。
+#### 问题
+##### 布局抖动
+布局抖动是因为开始图片没有宽高，内容显示出来后有了宽高导致位置变动。带来的影响主要是用户体验不好，用户的注意力已经锁定了某个区域准备阅读，突然那个区域下移了，中断阅读而重新定位。可以直接在img标签上设置要加载图片的宽高
+```html
+<img src="blank.gif" data-src="normal.jpg" style="width:800px;height:600px;" />
+```
+解决问题：方案解决的问题范围是图片宽高固定的情况，在响应式环境图片宽高不确定下不适用。
+用户体验：img的默认占位图是一个loading或是灰色背景，图片还没加载的体验。
+##### 响应式图片
+虽然响应式下图片的宽高会变，但是图片的宽高比是不变的，图片的宽高比变了图片也就变形了。所以img标签设定图片宽高比，就能根据不同视图的宽度算出不同高度。
+先创建一个宽高比为5:1的div
+```html
+   <div style="padding-bottom: 20%;background-color: green;"></div>
+```
+padding为百分比是相对自身宽度的百分比。
+然后再创建了一个宽高比为5:1的img
+```html
+    <div style="padding-bottom: 20%;position: relative;">
+        <img style="position:absolute;width: 100%;height:100%">
+      </div>
+```
+这样就能适应响应式的宽度改变，这种方式叫Aspect Ratio Boxes。
+占位图片可以设置成原图片的小尺寸图片，被放大后图片变模糊，这样开始加载小图片但图片的轮廓出现，后面在加载大图片显示清晰，给用户的体验是图片开始就在加载，然后加载完成就变清晰了。
+ img 标签srcset属性是处理响应式图片的。懒加载中可以设置data-srcset来延迟修改srcset属性。
+##### SEO不友好
+ <img> 标签中的 src 属性携带的仍然是原始大小的图片确保了站外 SEO、社会化分享、RSS 等不会读不到原图。Aspect Ratio Boxes方式使占位图片适应响应式，srcset 属性存放了一张原图的小尺寸缩略图阻止src原图的加载而加载缩略图优化加载体验，最后延迟将data-srcset的值赋值到srcset中。
+
+#### 插件
+###### [lazyload.js](https://github.com/tuupola/lazyload)
+是IntersectionObserver方式，而且当浏览器不支持IntersectionObserver的时候就直接加载图片，没有延迟加载的功能。
+###### [vue-lazyload](https://github.com/hilongjw/vue-lazyload)
+IntersectionObserver和getBoundingClientRect方式都有，默认getBoundingClientRect方式懒加载，里面的一些封装细节有很多有意思的地方，不止绑定了onscroll事件还绑定了'onwheel'、'onmousewheel'、'onresize', 'onanimationend'、'ontransitionend'、'ontouchmove'问什么要绑定这么多事件，插件为什么默认getBoundingClientRect方式而不用IntersectionObserver方式，待下回分解。
+###### [react-lazyload](https://github.com/twobin/react-lazyload)
+只用了getBoundingClientRect方式，里面的封装细节也很有意思，待下回分解。
+
+#### 待续
+图片懒加载库源码最详解
